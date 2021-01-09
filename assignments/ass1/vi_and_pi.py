@@ -187,10 +187,12 @@ def value_iteration(P, nS, nA, gamma=0.9, tol=1e-3):
 	while True:
 		prev_value_function = value_function.copy()
 
-		next_values = [[P[s][a][0]for a in range(nA)] for s in range(nS)]
+		outcomes = [[P[s][a] for a in range(nA)] for s in range(nS)]
 		next_values = [[
-			p[2] + gamma * value_function[p[1]] + (np.finfo(float).eps if p[3] else 0)
-			for p in i] for i in next_values]
+			np.sum([
+				prob * (reward + gamma * prev_value_function[next_state])
+				for prob, next_state, reward, term in outs
+			]) for outs in i] for i in outcomes]
 		next_values = np.array(next_values)
 		value_function = np.max(next_values, axis=1)
 
@@ -199,8 +201,10 @@ def value_iteration(P, nS, nA, gamma=0.9, tol=1e-3):
 
 	value_mat = [
 			[
-				value_function[s] + np.finfo(float).eps if P[s][a][0][3] else
-				value_function[P[s][a][0][1]] 
+				np.sum([
+					prob * (value_function[s if term else next_state] + (TERM_ADV if term else 0))
+					for prob, next_state, _, term in P[s][a]
+				])
 				for a in range(nA)
 				] for s in range(nS)
 		]
@@ -256,9 +260,9 @@ if __name__ == "__main__":
 	V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
 	render_single(env, p_pi, 100)
 
-	# print("\n" + "-"*25 + "\nBeginning Value Iteration\n" + "-"*25)
+	print("\n" + "-"*25 + "\nBeginning Value Iteration\n" + "-"*25)
 
-	# V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
-	# render_single(env, p_vi, 100)
+	V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
+	render_single(env, p_vi, 100)
 
 
