@@ -7,6 +7,8 @@ from lake_envs import *
 
 np.set_printoptions(precision=3)
 
+TERM_ADV = 0.000001
+
 """
 For policy_evaluation, policy_improvement, policy_iteration and value_iteration,
 the parameters P, nS, nA, gamma are defined as follows:
@@ -58,14 +60,18 @@ def policy_evaluation(P, nS, nA, policy, gamma=0.9, tol=1e-3):
 	while True:
 		prev_val_func = value_function.copy()
 
-		# iterate
+		# iterate`
 		for s in range(nS):
 			action = policy[s]
 
-			prob, next_state, reward, term = P[s][action][0]
+			outcomes = P[s][action]
 
-			value_function[s] = reward + gamma * value_function[next_state]
-		
+			value_function[s] = 0
+
+			for prob, next_state, reward, term in outcomes:
+
+				value_function[s] += prob * (reward + gamma * prev_val_func[next_state])
+
 		if np.max(np.abs(value_function - prev_val_func)) < tol:
 			break
 
@@ -100,8 +106,10 @@ def policy_improvement(P, nS, nA, value_from_policy, policy, gamma=0.9):
 
 	value_mat = [
 			[
-				value_from_policy[s] + np.finfo(float).eps if P[s][a][0][3] else
-				value_from_policy[P[s][a][0][1]] 
+				np.sum([
+					prob * (value_from_policy[s if term else next_state] + (TERM_ADV if term else 0))
+					for prob, next_state, _, term in P[s][a]
+				])
 				for a in range(nA)
 				] for s in range(nS)
 		]
@@ -248,9 +256,9 @@ if __name__ == "__main__":
 	V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
 	render_single(env, p_pi, 100)
 
-	print("\n" + "-"*25 + "\nBeginning Value Iteration\n" + "-"*25)
+	# print("\n" + "-"*25 + "\nBeginning Value Iteration\n" + "-"*25)
 
-	V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
-	render_single(env, p_vi, 100)
+	# V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
+	# render_single(env, p_vi, 100)
 
 
