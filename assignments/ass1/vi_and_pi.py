@@ -176,6 +176,29 @@ def value_iteration(P, nS, nA, gamma=0.9, tol=1e-3):
 	############################
 	# YOUR IMPLEMENTATION HERE #
 
+	while True:
+		prev_value_function = value_function.copy()
+
+		next_values = [[P[s][a][0]for a in range(nA)] for s in range(nS)]
+		next_values = [[
+			p[2] + gamma * value_function[p[1]] + (np.finfo(float).eps if p[3] else 0)
+			for p in i] for i in next_values]
+		next_values = np.array(next_values)
+		value_function = np.max(next_values, axis=1)
+
+		if np.max(np.abs(value_function - prev_value_function)) < tol:
+			break
+
+	value_mat = [
+			[
+				value_function[s] + np.finfo(float).eps if P[s][a][0][3] else
+				value_function[P[s][a][0][1]] 
+				for a in range(nA)
+				] for s in range(nS)
+		]
+	value_mat = np.array(value_mat)
+
+	policy = np.argmax(value_mat, axis=1).flatten().astype(int)
 
 	############################
 	return value_function, policy
@@ -225,9 +248,9 @@ if __name__ == "__main__":
 	V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
 	render_single(env, p_pi, 100)
 
-	# print("\n" + "-"*25 + "\nBeginning Value Iteration\n" + "-"*25)
+	print("\n" + "-"*25 + "\nBeginning Value Iteration\n" + "-"*25)
 
-	# V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
-	# render_single(env, p_vi, 100)
+	V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
+	render_single(env, p_vi, 100)
 
 
