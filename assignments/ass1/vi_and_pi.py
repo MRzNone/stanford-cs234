@@ -55,7 +55,19 @@ def policy_evaluation(P, nS, nA, policy, gamma=0.9, tol=1e-3):
 
 	############################
 	# YOUR IMPLEMENTATION HERE #
+	while True:
+		prev_val_func = value_function.copy()
 
+		# iterate
+		for s in range(nS):
+			action = policy[s]
+
+			prob, next_state, reward, term = P[s][action][0]
+
+			value_function[s] = reward + gamma * value_function[next_state]
+		
+		if np.max(np.abs(value_function - prev_val_func)) < tol:
+			break
 
 	############################
 	return value_function
@@ -81,11 +93,21 @@ def policy_improvement(P, nS, nA, value_from_policy, policy, gamma=0.9):
 		given value function.
 	"""
 
-	new_policy = np.zeros(nS, dtype='int')
+	# new_policy = np.zeros(nS, dtype='int')
 
 	############################
 	# YOUR IMPLEMENTATION HERE #
 
+	value_mat = [
+			[
+				value_from_policy[s] + np.finfo(float).eps if P[s][a][0][3] else
+				value_from_policy[P[s][a][0][1]] 
+				for a in range(nA)
+				] for s in range(nS)
+		]
+	value_mat = np.array(value_mat)
+
+	new_policy = np.argmax(value_mat, axis=1).flatten().astype(int)
 
 	############################
 	return new_policy
@@ -114,6 +136,18 @@ def policy_iteration(P, nS, nA, gamma=0.9, tol=10e-3):
 
 	############################
 	# YOUR IMPLEMENTATION HERE #
+	while True:
+		prev_policy = policy.copy()
+
+		# eval
+		value_function = policy_evaluation(P, nS, nA, prev_policy, gamma, tol)
+
+		# improve
+		policy = policy_improvement(P, nS, nA, value_function, prev_policy, gamma)
+
+		# compare
+		if np.all(policy == prev_policy):
+			break
 
 
 	############################
@@ -191,9 +225,9 @@ if __name__ == "__main__":
 	V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
 	render_single(env, p_pi, 100)
 
-	print("\n" + "-"*25 + "\nBeginning Value Iteration\n" + "-"*25)
+	# print("\n" + "-"*25 + "\nBeginning Value Iteration\n" + "-"*25)
 
-	V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
-	render_single(env, p_vi, 100)
+	# V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
+	# render_single(env, p_vi, 100)
 
 
