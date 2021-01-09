@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from functools import reduce
 import numpy as np
+from torch.utils.tensorboard import SummaryWriter
+from datetime import datetime
 
 from q1_schedule import LinearExploration, LinearSchedule
 from utils.test_env import EnvTest
@@ -9,7 +11,8 @@ from core.q_learning import QN
 
 from configs.q2_linear import config
 
-class DQN_PT(QN):
+class Linear(QN):
+
     def process_state(self, state):
         """
         Processing of state
@@ -48,18 +51,25 @@ class DQN_PT(QN):
         state_shape[-1] = self.config.state_history
         
         # build model
-        in_dim = reduce(lambda a,b: a*b, state_shape)
-
         num_actions = self.env.action_space.n
 
-        self.model = nn.Linear(in_dim, num_actions).cuda()
-        self.target_model = nn.Linear(in_dim, num_actions).cuda()
+        self.model = self._build_model(state_shape, num_actions).cuda()
+        self.target_model = self._build_model(state_shape, num_actions).cuda()
         self.update_target_params()
 
         # optimization
         self.loss = lambda a, b: torch.mean((a - b) ** 2)
         self.optim = torch.optim.Adam(self.model.parameters(), 0.0001)
         self.optim.zero_grad()
+
+        # logger
+        tb_log_dir = self.config.output_path + "tb/" + str(datetime.now()).replace(' ', '_')
+        self.tb_writer = SummaryWriter(tb_log_dir)
+        self.steps = 0
+
+    def _build_model(self, in_dim, out_dim):
+        in_dim = reduce(lambda a,b: a*b, in_dim)
+        return nn.Linear(in_dim, out_dim)
 
     def save(self):
         """
@@ -89,13 +99,12 @@ class DQN_PT(QN):
         return best_actions, action_values
 
     def _get_grad(self):
-        w = self.model.weight.grad
-        b = self.model.bias.grad
+        grads = [p.grad for p in list(self.model.parameters())]
 
-        if w is None or b is None:
-            return 0
+        if None in grads:
+            return torch.zeros(1)
 
-        grad = torch.cat([w.flatten(), b.flatten()])
+        grad = torch.cat([g.flatten() for g in grads])
 
         return grad.detach()
 
@@ -127,11 +136,11 @@ class DQN_PT(QN):
         # forward
         pred_qval = self.model(s_batch)
         pred_qval = torch.stack([pred_qval[i][a_batch[i]] for i in range(len(pred_qval))])
-        next_qval = self.target_model(sp_batch).max(1)[0] * (1 - done_mask_batch)
+        with torch.no_grad():
+            next_qval = self.target_model(sp_batch).max(1)[0] * (1 - done_mask_batch)
+            target_qval = r_batch + self.config.gamma * next_qval
 
         # optimize
-        target_qval = r_batch + self.config.gamma * next_qval
-
         loss = self.loss(target_qval, pred_qval)
 
         self.optim.param_groups[0]['lr'] = lr
@@ -139,6 +148,14 @@ class DQN_PT(QN):
         self.optim.zero_grad()
         loss.backward()
         self.optim.step()
+
+        self.steps += 1
+
+        if self.steps % self.config.log_freq == 0:
+            self.tb_writer.add_scalar("Train/loss", loss, self.steps)
+            self.tb_writer.add_scalar("Train/avg_reward", self.avg_reward, self.steps)
+            self.tb_writer.add_scalar("Train/max_reward", self.max_reward, self.steps)
+            self.tb_writer.add_scalar("Train/std_reward", self.std_reward, self.steps)
 
         return loss, torch.norm(self._get_grad())
 
@@ -161,5 +178,5 @@ if __name__ == '__main__':
             config.lr_nsteps)
 
     # train model
-    model = DQN_PT(env, config)
+    model = Linear(env, config)
     model.run(exp_schedule, lr_schedule)

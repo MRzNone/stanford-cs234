@@ -1,10 +1,11 @@
-import tensorflow as tf
-import tensorflow.contrib.layers as layers
+import torch
+from torch import nn
 
 from utils.general import get_logger
 from utils.test_env import EnvTest
 from q1_schedule import LinearExploration, LinearSchedule
-from q2_linear import Linear
+# from q2_linear import Linear
+from q2_linear_pt import Linear
 
 
 from configs.q3_nature import config
@@ -16,48 +17,28 @@ class NatureQN(Linear):
     https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf
     https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf
     """
-    def get_q_values_op(self, state, scope, reuse=False):
-        """
-        Returns Q values for all actions
+    def _build_model(self, in_dim, out_dim):
 
-        Args:
-            state: (tf tensor) 
-                shape = (batch_size, img height, img width, nchannels)
-            scope: (string) scope name, that specifies if target network or not
-            reuse: (bool) reuse of variables in the scope
+        return nn.Sequential(
+            nn.Conv2d(4, 32, 8, 4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4, 2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, 1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(64*6*6, 512),
+            nn.ReLU(),
+            nn.Linear(512, out_dim)
+        )
 
-        Returns:
-            out: (tf tensor) of shape = (batch_size, num_actions)
-        """
-        # this information might be useful
-        num_actions = self.env.action_space.n
-        out = state
-        ##############################################################
-        """
-        TODO: implement the computation of Q values like in the paper
-                https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf
-                https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf
+    def process_state(self, state):
+        state = torch.tensor(state, dtype=torch.float32)
 
-              you may find the section "model architecture" of the appendix of the 
-              nature paper particulary useful.
+        if len(state.shape) < 4:
+            state.unsqueeze_(0)
 
-              store your result in out of shape = (batch_size, num_actions)
-
-        HINT: you may find tensorflow.contrib.layers useful (imported)
-              make sure to understand the use of the scope param
-              make sure to flatten() the tensor before connecting it to fully connected layers 
-
-              you can use any other methods from tensorflow
-              you are not allowed to import extra packages (like keras,
-              lasagne, cafe, etc.)
-
-        """
-        ##############################################################
-        ################ YOUR CODE HERE - 10-15 lines ################ 
-
-        ##############################################################
-        ######################## END YOUR CODE #######################
-        return out
+        return state.permute(0, 3, 1, 2)
 
 
 """

@@ -62,7 +62,7 @@ class PreproWrapper(gym.Wrapper):
         self.high = high
 
 
-    def _step(self, action):
+    def step(self, action):
         """
         Overwrites _step function from environment to apply preprocess
         """
@@ -71,12 +71,12 @@ class PreproWrapper(gym.Wrapper):
         return self.obs, reward, done, info
 
 
-    def _reset(self):
+    def reset(self):
         self.obs = self.prepro(self.env.reset())
         return self.obs
 
 
-    def _render(self, mode='human', close=False):
+    def render(self, mode='human', close=False):
         """
         Overwrite _render function to vizualize preprocessing
         """

@@ -9,7 +9,7 @@ class config():
 
     # output config
     output_path  = "results/q4_train_atari_linear/"
-    model_output = output_path + "model.weights/"
+    model_output = output_path + "model.weights"
     log_path     = output_path + "log.txt"
     plot_output  = output_path + "scores.png"
     record_path  = output_path + "monitor/"

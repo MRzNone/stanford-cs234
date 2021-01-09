@@ -3,7 +3,7 @@ from utils.preprocess import greyscale
 from utils.wrappers import PreproWrapper, MaxAndSkipEnv
 
 from q1_schedule import LinearExploration, LinearSchedule
-from q2_linear import Linear
+from q2_linear_pt import Linear
 
 from configs.q4_train_atari_linear import config
 
