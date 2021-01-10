@@ -6,6 +6,8 @@ import time
 import sys
 from gym import wrappers
 from collections import deque
+from datetime import datetime
+from torch.utils.tensorboard import SummaryWriter
 
 from utils.general import get_logger, Progbar, export_plot
 from utils.replay_buffer import ReplayBuffer
@@ -39,6 +41,10 @@ class QN(object):
         # build model
         self.build()
 
+        # logger
+        tb_log_dir = self.config.output_path + "tb/" + str(datetime.now()).replace(' ', '_')
+        self.tb_writer = SummaryWriter(tb_log_dir)
+        self.steps = 0
 
     def build(self):
         """
@@ -194,6 +200,7 @@ class QN(object):
 
                 # perform a training step
                 loss_eval, grad_eval = self.train_step(t, replay_buffer, lr_schedule.epsilon)
+                self.steps += 1
 
                 # logging stuff
                 if ((t > self.config.learning_start) and (t % self.config.log_freq == 0) and
@@ -206,6 +213,12 @@ class QN(object):
                                         ("Max R", np.max(rewards)), ("eps", exp_schedule.epsilon), 
                                         ("Grads", grad_eval), ("Max Q", self.max_q), 
                                         ("lr", lr_schedule.epsilon)])
+
+                        # TB logger
+                        self.tb_writer.add_scalar("Train/avg_reward", self.avg_reward, self.steps)
+                        self.tb_writer.add_scalar("Train/max_reward", self.max_reward, self.steps)
+                        self.tb_writer.add_scalar("Train/std_reward", self.std_reward, self.steps)
+                        self.tb_writer.add_scalar("Train/max_q", self.max_q, self.steps)
 
                 elif (t < self.config.learning_start) and (t % self.config.log_freq == 0):
                     sys.stdout.write("\rPopulating the memory {}/{}...".format(t, 
@@ -225,6 +238,10 @@ class QN(object):
                 last_eval = 0
                 print("")
                 scores_eval += [self.evaluate()]
+
+                # tb logger
+                self.tb_writer.add_scalar("Eval/reward", scores_eval[-1], self.steps)
+
 
             if (t > self.config.learning_start) and self.config.record and (last_record > self.config.record_freq):
                 self.logger.info("Recording...")

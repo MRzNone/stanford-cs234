@@ -20,7 +20,7 @@ class NatureQN(Linear):
     def _build_model(self, in_dim, out_dim):
 
         return nn.Sequential(
-            nn.Conv2d(4, 32, 8, 4),
+            nn.Conv2d(in_dim[-1], 32, 8, 4),
             nn.ReLU(),
             nn.Conv2d(32, 64, 4, 2),
             nn.ReLU(),
@@ -34,6 +34,8 @@ class NatureQN(Linear):
 
     def process_state(self, state):
         state = torch.tensor(state, dtype=torch.float32)
+
+        state /= self.config.high
 
         if len(state.shape) < 4:
             state.unsqueeze_(0)

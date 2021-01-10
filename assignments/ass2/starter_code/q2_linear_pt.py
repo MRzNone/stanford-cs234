@@ -2,8 +2,6 @@ import torch
 from torch import nn
 from functools import reduce
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
-from datetime import datetime
 
 from q1_schedule import LinearExploration, LinearSchedule
 from utils.test_env import EnvTest
@@ -55,17 +53,13 @@ class Linear(QN):
 
         self.model = self._build_model(state_shape, num_actions).cuda()
         self.target_model = self._build_model(state_shape, num_actions).cuda()
-        self.update_target_params()
 
         # optimization
-        self.loss = lambda a, b: torch.mean((a - b) ** 2)
-        self.optim = torch.optim.Adam(self.model.parameters(), 0.0001)
+        # self.loss = lambda a, b: torch.mean((a - b) ** 2)
+        self.loss = torch.nn.MSELoss().cuda()
+        self.optim = torch.optim.Adam(self.model.parameters(), 1e-4)
         self.optim.zero_grad()
-
-        # logger
-        tb_log_dir = self.config.output_path + "tb/" + str(datetime.now()).replace(' ', '_')
-        self.tb_writer = SummaryWriter(tb_log_dir)
-        self.steps = 0
+        self.update_target_params()
 
     def _build_model(self, in_dim, out_dim):
         in_dim = reduce(lambda a,b: a*b, in_dim)
@@ -92,9 +86,11 @@ class Linear(QN):
         """
         state = self.process_state(state).cuda()
 
+        assert state.size(0) == 1
+
         action_values = self.model(state).flatten().cpu().detach_().numpy()
 
-        best_actions = np.argmax(action_values)
+        best_actions = np.argmax(action_values).item()
 
         return best_actions, action_values
 
@@ -129,13 +125,15 @@ class Linear(QN):
         s_batch = self.process_state(s_batch).cuda()
         sp_batch = self.process_state(sp_batch).cuda()
 
-        # a_batch = torch.Tensor(r_batch).cuda().long()
+        a_batch = torch.tensor(a_batch).cuda().long()
         r_batch = torch.tensor(r_batch).cuda()
         done_mask_batch = torch.tensor(done_mask_batch).cuda()
+        # not_done_mask_batch = done_mask_batch.bool().logical_not()
 
         # forward
-        pred_qval = self.model(s_batch)
-        pred_qval = torch.stack([pred_qval[i][a_batch[i]] for i in range(len(pred_qval))])
+        pred_qval_all = self.model(s_batch)
+        pred_qval = pred_qval_all.gather(1, a_batch.unsqueeze_(1))
+        # pred_qval = torch.stack([pred_qval[i][a_batch[i]] for i in range(len(pred_qval))])
         with torch.no_grad():
             next_qval = self.target_model(sp_batch).max(1)[0] * (1 - done_mask_batch)
             target_qval = r_batch + self.config.gamma * next_qval
@@ -147,15 +145,10 @@ class Linear(QN):
 
         self.optim.zero_grad()
         loss.backward()
+        # clamp gradient
+        # for param in self.model.parameters():
+        #     param.grad.data.clamp_(-1, 1)
         self.optim.step()
-
-        self.steps += 1
-
-        if self.steps % self.config.log_freq == 0:
-            self.tb_writer.add_scalar("Train/loss", loss, self.steps)
-            self.tb_writer.add_scalar("Train/avg_reward", self.avg_reward, self.steps)
-            self.tb_writer.add_scalar("Train/max_reward", self.max_reward, self.steps)
-            self.tb_writer.add_scalar("Train/std_reward", self.std_reward, self.steps)
 
         return loss, torch.norm(self._get_grad())
 
